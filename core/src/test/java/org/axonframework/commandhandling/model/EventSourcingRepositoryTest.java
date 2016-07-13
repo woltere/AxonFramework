@@ -20,6 +20,7 @@ import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventhandling.EventHandler;
 import org.axonframework.eventhandling.EventMessage;
 import org.axonframework.eventsourcing.AggregateIdentifier;
+import org.axonframework.eventsourcing.Conflict;
 import org.axonframework.eventsourcing.DomainEventMessage;
 import org.axonframework.eventsourcing.EventSourcingRepository;
 import org.axonframework.eventsourcing.GenericDomainEventMessage;
@@ -108,6 +109,18 @@ public class EventSourcingRepositoryTest {
         verify(eventStore).publish(messages.get(1));
     }
 
+    @Test
+    public void testSuccessfulConflictResolution() throws Exception {
+        Aggregate<StubAggregate> instance = repository.newInstance(() -> new StubAggregate("id", "Hello"));
+        instance.handle(asCommandMessage(true));
+    }
+
+    @Test
+    public void testFailedConflictResolution() throws Exception {
+        Aggregate<StubAggregate> instance = repository.newInstance(() -> new StubAggregate("id", "Hello"));
+        instance.handle(asCommandMessage(true));
+    }
+
     @AggregateRoot
     public static class StubAggregate {
 
@@ -127,6 +140,13 @@ public class EventSourcingRepositoryTest {
         @CommandHandler
         public void handle(String command) {
             AggregateLifecycle.doApply(command);
+        }
+
+        @CommandHandler
+        public void handle(Boolean resolve, Conflict conflict) {
+            if (resolve) {
+                conflict.resolve();
+            }
         }
 
         public void changeState() {

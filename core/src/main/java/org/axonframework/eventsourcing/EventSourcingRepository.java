@@ -16,7 +16,9 @@
 
 package org.axonframework.eventsourcing;
 
+import org.axonframework.commandhandling.model.Aggregate;
 import org.axonframework.commandhandling.model.AggregateNotFoundException;
+import org.axonframework.commandhandling.model.ConflictingAggregateVersionException;
 import org.axonframework.commandhandling.model.LockingRepository;
 import org.axonframework.commandhandling.model.inspection.EventSourcedAggregate;
 import org.axonframework.common.Assert;
@@ -24,6 +26,7 @@ import org.axonframework.common.annotation.ParameterResolverFactory;
 import org.axonframework.common.lock.LockFactory;
 import org.axonframework.eventsourcing.eventstore.DomainEventStream;
 import org.axonframework.eventsourcing.eventstore.EventStore;
+import org.axonframework.messaging.unitofwork.CurrentUnitOfWork;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -58,6 +61,28 @@ public class EventSourcingRepository<T> extends LockingRepository<T, EventSource
         this(new GenericAggregateFactory<>(aggregateType), eventStore);
     }
 
+    @Override
+    protected void validateOnLoad(Aggregate<T> aggregate, Long expectedVersion) {
+        super.validateOnLoad(aggregate, expectedVersion);
+
+        CurrentUnitOfWork.get().resources().compute("conflicts", (s, o) -> {
+            return eventStore.readEvents(aggregate.identifier(),
+                                         aggregate.version(),
+                                         expectedVersion);
+        });
+
+        Conflict conflict = new Conflict(aggregate.identifier(), aggregate.version(), expectedVersion);
+
+        CurrentUnitOfWork.get().onPrepareCommit(unitOfWork -> {
+            if (!conflict.isResolved()) {
+                throw new ConflictingAggregateVersionException(aggregate.identifier(),
+                                                               expectedVersion,
+                                                               aggregate.version());
+            }
+        });
+        CurrentUnitOfWork.get().resources().get("conflicts")
+    }
+
     /**
      * Initializes a repository with the default locking strategy, using the given {@code aggregateFactory} to
      * create new aggregate instances.
@@ -78,12 +103,13 @@ public class EventSourcingRepository<T> extends LockingRepository<T, EventSource
      * Initializes a repository with the default locking strategy, using the given {@code aggregateFactory} to
      * create new aggregate instances.
      *
-     * @param aggregateFactory          The factory for new aggregate instances
-     * @param eventStore                The event store that holds the event streams for this repository
-     * @param parameterResolverFactory  The parameter resolver factory used to resolve parameters of annotated handlers
+     * @param aggregateFactory         The factory for new aggregate instances
+     * @param eventStore               The event store that holds the event streams for this repository
+     * @param parameterResolverFactory The parameter resolver factory used to resolve parameters of annotated handlers
      * @see LockingRepository#LockingRepository(Class)
      */
-    public EventSourcingRepository(AggregateFactory<T> aggregateFactory, EventStore eventStore, ParameterResolverFactory parameterResolverFactory) {
+    public EventSourcingRepository(AggregateFactory<T> aggregateFactory, EventStore eventStore,
+                                   ParameterResolverFactory parameterResolverFactory) {
         super(aggregateFactory.getAggregateType(), parameterResolverFactory);
         Assert.notNull(eventStore, "eventStore may not be null");
         this.eventStore = eventStore;
@@ -97,7 +123,8 @@ public class EventSourcingRepository<T> extends LockingRepository<T, EventSource
      * @param eventStore       The event store that holds the event streams for this repository
      * @param lockFactory      the locking strategy to apply to this repository
      */
-    public EventSourcingRepository(AggregateFactory<T> aggregateFactory, EventStore eventStore, LockFactory lockFactory) {
+    public EventSourcingRepository(AggregateFactory<T> aggregateFactory, EventStore eventStore,
+                                   LockFactory lockFactory) {
         super(aggregateFactory.getAggregateType(), lockFactory);
         Assert.notNull(eventStore, "eventStore may not be null");
         this.eventStore = eventStore;
@@ -107,12 +134,13 @@ public class EventSourcingRepository<T> extends LockingRepository<T, EventSource
     /**
      * Initialize a repository with the given locking strategy and parameter resolver factory.
      *
-     * @param aggregateFactory              The factory for new aggregate instances
-     * @param eventStore                    The event store that holds the event streams for this repository
-     * @param lockFactory                   The locking strategy to apply to this repository
-     * @param parameterResolverFactory      The parameter resolver factory used to resolve parameters of annotated handlers
+     * @param aggregateFactory         The factory for new aggregate instances
+     * @param eventStore               The event store that holds the event streams for this repository
+     * @param lockFactory              The locking strategy to apply to this repository
+     * @param parameterResolverFactory The parameter resolver factory used to resolve parameters of annotated handlers
      */
-    public EventSourcingRepository(AggregateFactory<T> aggregateFactory, EventStore eventStore, LockFactory lockFactory, ParameterResolverFactory parameterResolverFactory) {
+    public EventSourcingRepository(AggregateFactory<T> aggregateFactory, EventStore eventStore, LockFactory lockFactory,
+                                   ParameterResolverFactory parameterResolverFactory) {
         super(aggregateFactory.getAggregateType(), lockFactory, parameterResolverFactory);
         Assert.notNull(eventStore, "eventStore may not be null");
         this.eventStore = eventStore;
@@ -137,6 +165,7 @@ public class EventSourcingRepository<T> extends LockingRepository<T, EventSource
      * @param aggregateIdentifier the identifier of the aggregate to load
      * @param expectedVersion     The expected version of the loaded aggregate
      * @return the fully initialized aggregate
+     *
      * @throws AggregateDeletedException  in case an aggregate existed in the past, but has been deleted
      * @throws AggregateNotFoundException when an aggregate with the given identifier does not exist
      */

@@ -2,3 +2,4 @@ org.axonframework.common.annotation.DefaultParameterResolverFactory
 org.axonframework.commandhandling.CurrentUnitOfWorkParameterResolverFactory
 org.axonframework.eventhandling.SequenceNumberParameterResolverFactory
 org.axonframework.eventhandling.TimestampParameterResolverFactory
+org.axonframework.eventsourcing.ConflictParameterResolverFactory
