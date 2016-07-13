@@ -16,6 +16,8 @@
 
 package org.axonframework.common.jdbc;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -61,7 +63,10 @@ public abstract class ConnectionWrapperFactory {
                                                            return connection.hashCode();
                                                        } else if (method.getDeclaringClass().isAssignableFrom(
                                                                wrapperInterface)) {
-                                                           return method.invoke(wrapperHandler, args);
+                                                           return invokeAndUnwrapInvocationTargetException(
+                                                                   wrapperHandler,
+                                                                   method,
+                                                                   args);
                                                        } else if ("close".equals(method.getName())
                                                                && isEmpty(args)) {
                                                            closeHandler.close(connection);
@@ -71,7 +76,9 @@ public abstract class ConnectionWrapperFactory {
                                                            closeHandler.commit(connection);
                                                            return null;
                                                        } else {
-                                                           return method.invoke(connection, args);
+                                                           return invokeAndUnwrapInvocationTargetException(connection,
+                                                                                                           method,
+                                                                                                           args);
                                                        }
                                                    });
     }
@@ -88,28 +95,38 @@ public abstract class ConnectionWrapperFactory {
     public static Connection wrap(final Connection connection, final ConnectionCloseHandler closeHandler) {
         return (Connection) Proxy.newProxyInstance(closeHandler.getClass().getClassLoader(),
                                                    new Class[]{Connection.class}, (proxy, method, args) -> {
-                                                       if ("equals".equals(method.getName()) && args != null
-                                                               && args.length == 1) {
-                                                           return proxy == args[0];
-                                                       } else if ("hashCode".equals(
-                                                               method.getName()) && isEmpty(args)) {
-                                                           return connection.hashCode();
-                                                       } else if ("close".equals(method.getName())
-                                                               && isEmpty(args)) {
-                                                           closeHandler.close(connection);
-                                                           return null;
-                                                       } else if ("commit".equals(method.getName())
-                                                               && isEmpty(args)) {
-                                                           closeHandler.commit(connection);
-                                                           return null;
-                                                       } else {
-                                                           return method.invoke(connection, args);
-                                                       }
-                                                   });
+                    if ("equals".equals(method.getName()) && args != null
+                            && args.length == 1) {
+                        return proxy == args[0];
+                    } else if ("hashCode".equals(
+                            method.getName()) && isEmpty(args)) {
+                        return connection.hashCode();
+                    } else if ("close".equals(method.getName())
+                            && isEmpty(args)) {
+                        closeHandler.close(connection);
+                        return null;
+                    } else if ("commit".equals(method.getName())
+                            && isEmpty(args)) {
+                        closeHandler.commit(connection);
+                        return null;
+                    } else {
+                        return invokeAndUnwrapInvocationTargetException(connection, method, args);
+                    }
+                });
     }
 
     private static boolean isEmpty(Object[] array) {
         return array == null || array.length == 0;
+    }
+
+    private static Object invokeAndUnwrapInvocationTargetException(Object objectToInvokeMethodOn, Method method,
+                                                                   Object[] args)
+            throws Throwable {
+        try {
+            return method.invoke(objectToInvokeMethodOn, args);
+        } catch (InvocationTargetException e) {
+            throw e.getCause();
+        }
     }
 
     /**
