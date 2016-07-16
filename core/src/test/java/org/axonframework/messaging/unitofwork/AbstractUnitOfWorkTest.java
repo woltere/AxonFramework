@@ -123,7 +123,7 @@ public class AbstractUnitOfWorkTest {
     @Test
     public void testExecuteTaskWithResult() throws Exception {
         Object taskResult = new Object();
-        Callable<?> task = mock(Callable.class);
+        Callable<Object> task = mock(Callable.class);
         when(task.call()).thenReturn(taskResult);
         Object result = subject.executeWithResult(task);
         InOrder inOrder = inOrder(task, subject);

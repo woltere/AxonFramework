@@ -18,6 +18,7 @@ import org.axonframework.serialization.*;
 
 import javax.persistence.Basic;
 import javax.persistence.Column;
+import javax.persistence.FetchType;
 import javax.persistence.Lob;
 import javax.persistence.MappedSuperclass;
 import java.time.Instant;
@@ -37,11 +38,9 @@ public abstract class AbstractEventEntry<T> implements EventData<T> {
     private String payloadType;
     @Basic
     private String payloadRevision;
-    @Basic(optional = false)
-    @Lob
+    @Basic(optional = false, fetch = FetchType.LAZY)
     private T payload;
-    @Basic
-    @Lob
+    @Basic(optional = false, fetch = FetchType.LAZY)
     private T metaData;
 
     public AbstractEventEntry(EventMessage<?> eventMessage, Serializer serializer, Class<T> contentType) {

@@ -71,7 +71,7 @@ public abstract class AbstractCommandGateway {
      * @param <R>      The type of response expected from the command
      */
     protected <C, R> void send(C command, CommandCallback<? super C, R> callback) {
-        CommandMessage<? extends C> commandMessage = processInterceptors(asCommandMessage(command));
+        CommandMessage<? extends C> commandMessage = (CommandMessage<? extends C>) processInterceptors(asCommandMessage(command));
         CommandCallback<? super C, R> commandCallback = callback;
         if (retryScheduler != null) {
             commandCallback = new RetryingCallback<>(callback, retryScheduler, commandBus);

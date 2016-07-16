@@ -30,7 +30,7 @@ public class LazyDeserializingObjectTest {
     private Serializer mockSerializer;
 
     private SerializedType mockType;
-    private SerializedObject mockObject;
+    private SerializedObject<?> mockObject;
 
     private String mockDeserializedObject = "I'm a mock";
 
@@ -39,7 +39,7 @@ public class LazyDeserializingObjectTest {
     public void setUp() throws Exception {
         mockSerializer = mock(Serializer.class);
         mockType = mock(SerializedType.class);
-        mockObject = new SimpleSerializedObject(mockDeserializedObject, String.class, mockType);
+        mockObject = new SimpleSerializedObject<String>(mockDeserializedObject, String.class, mockType);
 
         when(mockSerializer.classForType(mockType)).thenReturn(String.class);
         when(mockSerializer.deserialize(mockObject)).thenReturn(mockDeserializedObject);

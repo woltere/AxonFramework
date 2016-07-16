@@ -48,7 +48,7 @@ public class AggregateMemberAnnotatedChildEntityCollectionDefinition implements 
                 childEntityModel.commandHandlers().values().stream()
                         .collect(Collectors.toConcurrentMap(
                                 CommandMessageHandler::commandName,
-                                h -> getProperty(h.payloadType(),
+                                h -> getProperty(h.payloadType(), (String)
                                                  getOrDefault(h.routingKey(), childEntityModel.routingKey()))));
         //noinspection unchecked
         return Optional.of(new AnnotatedChildEntity<>(
